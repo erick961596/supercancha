@@ -7,6 +7,7 @@ use Laravel\Socialite\Facades\Socialite;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 
+use Illuminate\Support\Str;
 
 class SocialLoginController extends Controller
 {
@@ -23,7 +24,7 @@ class SocialLoginController extends Controller
      */
     public function handleGoogleCallback()
     {
-        $googleUser = Socialite::driver('google')->stateless()->user();
+        $googleUser = Socialite::driver('google')->user();
 
         $user = User::firstOrCreate(
             ['email' => $googleUser->getEmail()],
