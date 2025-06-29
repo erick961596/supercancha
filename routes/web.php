@@ -8,61 +8,99 @@ use App\Http\Controllers\Owner\CourtController;
 use App\Http\Controllers\Owner\ScheduleController;
 use App\Http\Controllers\Owner\MembershipController;
 use App\Http\Controllers\Player\ReservationController;
-
 use App\Http\Controllers\Auth\SocialLoginController;
 use App\Http\Controllers\Player\BookingController;
 use App\Http\Controllers\Player\DashboardController;
 use App\Http\Controllers\Player\VenueDetailController;
+use App\Http\Controllers\ProfileController;
 
-// Página principal
+/*--------------------------------------------------------------------------
+| Rutas Públicas
+|--------------------------------------------------------------------------*/
 Route::get('/', function () {
-    return view('welcome'); // Podés reemplazar con landing
-});
+    return view('welcome');
+})->name('home');
 
-
-
+// Autenticación social
 Route::get('/auth/google', [SocialLoginController::class, 'redirectToGoogle'])->name('auth.google');
 Route::get('/auth/google/callback', [SocialLoginController::class, 'handleGoogleCallback']);
 
-
-// Auth (Laravel Breeze ya las incluye)
+// Autenticación Breeze
 require __DIR__.'/auth.php';
 
+/*--------------------------------------------------------------------------
+| Rutas Protegidas (requieren autenticación)
+|--------------------------------------------------------------------------*/
+Route::middleware(['auth'])->group(function () {
+    // Dashboard principal con redirección inteligente
+    Route::get('/dashboard', function () {
+        $user = auth()->user();
 
-// =================== ADMIN ===================
-Route::middleware(['auth', 'role:admin'])
-    ->prefix('admin')
-    ->name('admin.')
-    ->group(function () {
-        Route::view('/dashboard', 'cancheo.admin.dashboard')->name('dashboard');
-        Route::resource('sports', SportController::class);
-        Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+        return match(true) {
+            $user->hasRole('admin') => redirect()->route('admin.dashboard'),
+            $user->hasRole('owner') => redirect()->route('owner.dashboard'),
+            $user->hasRole('player') => redirect()->route('player.dashboard'),
+            default => redirect()->route('home')
+        };
+    })->name('dashboard');
+
+    /*--------------------------------------------------------------------------
+    | Perfil de Usuario (común para todos los roles)
+    |--------------------------------------------------------------------------*/
+    Route::prefix('profile')->group(function () {
+        Route::get('/', [ProfileController::class, 'edit'])->name('profile.edit');
+        Route::patch('/', [ProfileController::class, 'update'])->name('profile.update');
+        Route::delete('/', [ProfileController::class, 'destroy'])->name('profile.destroy');
+        Route::put('password', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
     });
 
+    /*--------------------------------------------------------------------------
+    | Área de Administrador
+    |--------------------------------------------------------------------------*/
+    Route::middleware(['role:admin'])
+        ->prefix('admin')
+        ->name('admin.')
+        ->group(function () {
+            Route::view('/dashboard', 'cancheo.admin.dashboard')->name('dashboard');
+            Route::resource('sports', SportController::class);
+            Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+        });
 
-// =================== OWNER ===================
-Route::middleware(['auth', 'role:owner'])
-    ->prefix('owner')
-    ->name('owner.')
-    ->group(function () {
-        Route::view('/dashboard', 'cancheo.owner.dashboard')->name('dashboard');
-        Route::resource('venues', VenueController::class);
-        Route::resource('courts', CourtController::class);
-        Route::resource('schedules', ScheduleController::class);
-        Route::resource('memberships', MembershipController::class);
-    });
+    /*--------------------------------------------------------------------------
+    | Área de Dueños
+    |--------------------------------------------------------------------------*/
+    Route::middleware(['role:owner'])
+        ->prefix('owner')
+        ->name('owner.')
+        ->group(function () {
+            Route::view('/dashboard', 'cancheo.owner.dashboard')->name('dashboard');
+            Route::resource('venues', VenueController::class);
+            Route::resource('courts', CourtController::class);
+            Route::resource('schedules', ScheduleController::class);
+            Route::resource('memberships', MembershipController::class);
+        });
 
+    /*--------------------------------------------------------------------------
+    | Área de Jugadores
+    |--------------------------------------------------------------------------*/
+    Route::middleware(['role:player'])
+        ->prefix('player')
+        ->name('player.')
+        ->group(function () {
+            // Dashboard
+            Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-// =================== PLAYER ===================
-Route::prefix('player')->middleware(['auth', 'role:player'])->name('player.')->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+            // Flujo de reserva
+            Route::prefix('reservar')->name('booking.')->group(function () {
+                Route::get('/deporte', [BookingController::class, 'selectSport'])->name('sport');
+                Route::get('/ubicacion', [BookingController::class, 'selectLocation'])->name('location');
+                Route::get('/canchas', [BookingController::class, 'listCourts'])->name('courts');
+            });
 
-    // Flujo de reserva
-    Route::get('/reservar/deporte', [BookingController::class, 'selectSport'])->name('booking.sport');
-    Route::get('/reservar/ubicacion', [BookingController::class, 'selectLocation'])->name('booking.location');
-    Route::get('/reservar/canchas', [BookingController::class, 'listCourts'])->name('booking.courts');
+            // Detalles de cancha
+            Route::get('/cancha/{venue}', [VenueDetailController::class, 'show'])->name('venue.show');
 
-    // Detalles
-    Route::get('/cancha/{id}', [VenueDetailController::class, 'show'])->name('venue.show');
+            // Gestión de reservas
+            Route::resource('reservations', ReservationController::class)->except(['create', 'store']);
+        });
 });
-

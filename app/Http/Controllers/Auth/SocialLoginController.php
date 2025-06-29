@@ -38,7 +38,7 @@ class SocialLoginController extends Controller
 
         Auth::login($user);
 
-        return redirect()->intended('/');
+        return redirect()->intended('/player/dashboard');
     }
 }
 
