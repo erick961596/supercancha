@@ -14,6 +14,8 @@ use App\Http\Controllers\Player\DashboardController;
 use App\Http\Controllers\Player\VenueDetailController;
 use App\Http\Controllers\ProfileController;
 
+use App\Models\User;
+
 /*--------------------------------------------------------------------------
 | Rutas Públicas
 |--------------------------------------------------------------------------*/
@@ -32,7 +34,7 @@ require __DIR__.'/auth.php';
 | Rutas Protegidas (requieren autenticación)
 |--------------------------------------------------------------------------*/
 Route::middleware(['auth'])->group(function () {
-    // Dashboard principal con redirección inteligente
+    // Dashboard principal con redirección por rol
     Route::get('/dashboard', function () {
         $user = auth()->user();
 
@@ -40,12 +42,12 @@ Route::middleware(['auth'])->group(function () {
             $user->hasRole('admin') => redirect()->route('admin.dashboard'),
             $user->hasRole('owner') => redirect()->route('owner.dashboard'),
             $user->hasRole('player') => redirect()->route('player.dashboard'),
-            default => redirect()->route('home')
+            default => redirect()->route('home'),
         };
     })->name('dashboard');
 
     /*--------------------------------------------------------------------------
-    | Perfil de Usuario (común para todos los roles)
+    | Perfil de Usuario
     |--------------------------------------------------------------------------*/
     Route::prefix('profile')->group(function () {
         Route::get('/', [ProfileController::class, 'edit'])->name('profile.edit');
